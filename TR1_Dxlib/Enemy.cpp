@@ -411,7 +411,7 @@ void Enemy::AttackOfSlime(int  map[MAP_HEIGHT][MAP_WIDTH]) {
 		if (enemy.motionTimer <= 0) {
 			enemy.isAttack = false;
 			enemy.motionPhase = 0;
-			enemy.attackCT = 1;
+			enemy.attackCT = 5;
 			enemy.speed.fixedValue = 1;
 		}
 	}
@@ -585,7 +585,7 @@ void Enemy::AttackOfFencer(int  map[MAP_HEIGHT][MAP_WIDTH]) {
 			enemy.motionPhase = 0;
 			enemy.motionTimer = 0;
 			enemy.isAttack = false;
-			enemy.attackCT = 1;
+			enemy.attackCT = 5;
 		}
 	}
 #pragma endregion//UŒ‚ƒpƒ^[ƒ“1
@@ -688,7 +688,7 @@ void Enemy::AttackOfFencer(int  map[MAP_HEIGHT][MAP_WIDTH]) {
 			enemy.motionPhase = 0;
 			enemy.motionTimer = 0;
 			enemy.isAttack = false;
-			enemy.attackCT = 1;
+			enemy.attackCT = 5;
 		}
 	}
 
