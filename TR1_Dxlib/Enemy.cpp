@@ -8,7 +8,7 @@ Enemy::Enemy(int enemyType) {
 	if (enemy.type == SLIME) {
 		//transform
 		enemy.transform.x = MAP_SIZE * 10;
-		enemy.transform.y = MAP_SIZE * ((double)MAP_HEIGHT - 1.5);
+		enemy.transform.y = MAP_SIZE * ((double)MAP_HEIGHT - 3.5);
 		enemy.transform.r = 15;
 
 		//speed
@@ -26,7 +26,7 @@ Enemy::Enemy(int enemyType) {
 	else if (enemy.type == FENCER) {
 		//transform
 		enemy.transform.x = MAP_SIZE * 20;
-		enemy.transform.y = MAP_SIZE * ((double)MAP_HEIGHT - 1.5);
+		enemy.transform.y = MAP_SIZE * ((double)MAP_HEIGHT - 3.5);
 		enemy.transform.r = 15;
 
 		//speed
@@ -46,7 +46,7 @@ Enemy::Enemy(int enemyType) {
 	else if (enemy.type == ARCHER) {
 		//transform
 		enemy.transform.x = MAP_SIZE * 30;
-		enemy.transform.y = MAP_SIZE * ((double)MAP_HEIGHT - 1.5);
+		enemy.transform.y = MAP_SIZE * ((double)MAP_HEIGHT - 3.5);
 		enemy.transform.r = 15;
 
 		//speed
@@ -164,57 +164,59 @@ void Enemy::Update(Player player , int  map[MAP_HEIGHT][MAP_WIDTH] , Scroll& scr
 				MoveOfArcher(map , player);
 			}
 		}
+	}
 
+	if (enemy.isInTheAir == true) {
+		if (enemy.isAttack == true) {
+			if (enemy.type != SLIME) {
+				enemy.speed.tmpY = enemy.speed.initialspeedY + (G / 50) * enemy.AirTimer;
 
-		if (enemy.isInTheAir == true) {
+				//現在のプレイヤーの四隅の縦方向の座標に一回分進んだ場合の座標を取得
+				enemy.mapColider.leftTopY = ((int)enemy.transform.y + enemy.speed.tmpY - (int)enemy.transform.r) / MAP_SIZE;
+				enemy.mapColider.rightTopY = ((int)enemy.transform.y + enemy.speed.tmpY - (int)enemy.transform.r) / MAP_SIZE;
+				enemy.mapColider.leftBottomY = ((int)enemy.transform.y + enemy.speed.tmpY + (int)enemy.transform.r - 1) / MAP_SIZE;
+				enemy.mapColider.rightBottomY = ((int)enemy.transform.y + enemy.speed.tmpY + (int)enemy.transform.r - 1) / MAP_SIZE;
 
-			enemy.speed.tmpY = enemy.speed.initialspeedY + (G / 50) * enemy.AirTimer;
-
-			//現在のプレイヤーの四隅の縦方向の座標に一回分進んだ場合の座標を取得
-			enemy.mapColider.leftTopY = ((int)enemy.transform.y + enemy.speed.tmpY - (int)enemy.transform.r) / MAP_SIZE;
-			enemy.mapColider.rightTopY = ((int)enemy.transform.y + enemy.speed.tmpY - (int)enemy.transform.r) / MAP_SIZE;
-			enemy.mapColider.leftBottomY = ((int)enemy.transform.y + enemy.speed.tmpY + (int)enemy.transform.r - 1) / MAP_SIZE;
-			enemy.mapColider.rightBottomY = ((int)enemy.transform.y + enemy.speed.tmpY + (int)enemy.transform.r - 1) / MAP_SIZE;
-
-			if (enemy.speed.tmpY < 0) {
-				if (map[enemy.mapColider.rightTopY][enemy.mapColider.rightTopX] == 0 &&
-					map[enemy.mapColider.leftTopY][enemy.mapColider.leftTopX] == 0) {
-					enemy.speed.y = enemy.speed.tmpY;
+				if (enemy.speed.tmpY < 0) {
+					if (map[enemy.mapColider.rightTopY][enemy.mapColider.rightTopX] == 0 &&
+						map[enemy.mapColider.leftTopY][enemy.mapColider.leftTopX] == 0) {
+						enemy.speed.y = enemy.speed.tmpY;
+					}
+					else {//天井にあたったら
+						enemy.AirTimer = 0;
+						enemy.speed.initialspeedY = 0;
+					}
 				}
-				else {//天井にあたったら
-					enemy.AirTimer = 0;
-					enemy.speed.initialspeedY = 0;
+
+				else if (0 <= enemy.speed.tmpY) {
+					if (map[enemy.mapColider.rightBottomY][enemy.mapColider.rightBottomX] == 0 &&
+						map[enemy.mapColider.leftBottomY][enemy.mapColider.leftBottomX] == 0) {
+						enemy.speed.y = enemy.speed.tmpY;
+					}
+					else {
+						//地面についたら
+						enemy.isInTheAir = false;
+						enemy.AirTimer = 0;
+						enemy.transform.y = enemy.mapColider.rightBottomY * MAP_SIZE - 16;
+					}
 				}
+
+				//実際に敵を進める
+				enemy.transform.y += enemy.speed.y;
+
+				//敵の本来の四隅の縦方向の座標を取得する
+				enemy.mapColider.leftTopY = ((int)enemy.transform.y - (int)enemy.transform.r) / MAP_SIZE;
+				enemy.mapColider.leftBottomY = ((int)enemy.transform.y + (int)enemy.transform.r - 1) / MAP_SIZE;
+				enemy.mapColider.rightTopY = ((int)enemy.transform.y - (int)enemy.transform.r) / MAP_SIZE;
+				enemy.mapColider.rightBottomY = ((int)enemy.transform.y + (int)enemy.transform.r - 1) / MAP_SIZE;
+
+				enemy.AirTimer++;
 			}
-
-			else if (0 <= enemy.speed.tmpY) {
-				if (map[enemy.mapColider.rightBottomY][enemy.mapColider.rightBottomX] == 0 &&
-					map[enemy.mapColider.leftBottomY][enemy.mapColider.leftBottomX] == 0) {
-					enemy.speed.y = enemy.speed.tmpY;
-				}
-				else {
-					//地面についたら
-					enemy.isInTheAir = false;
-					enemy.AirTimer = 0;
-					enemy.transform.y = enemy.mapColider.rightBottomY * MAP_SIZE - 16;
-				}
-			}
-
-			//実際に敵を進める
-			enemy.transform.y += enemy.speed.y;
-
-			//敵の本来の四隅の縦方向の座標を取得する
-			enemy.mapColider.leftTopY = ((int)enemy.transform.y - (int)enemy.transform.r) / MAP_SIZE;
-			enemy.mapColider.leftBottomY = ((int)enemy.transform.y + (int)enemy.transform.r - 1) / MAP_SIZE;
-			enemy.mapColider.rightTopY = ((int)enemy.transform.y - (int)enemy.transform.r) / MAP_SIZE;
-			enemy.mapColider.rightBottomY = ((int)enemy.transform.y + (int)enemy.transform.r - 1) / MAP_SIZE;
-
-			enemy.AirTimer++;
 		}
+	}
 
-		if (0 <= enemy.attackCT) {
-			enemy.attackCT--;
-		}
+	if (0 <= enemy.attackCT) {
+		enemy.attackCT--;
 	}
 	enemy.screen.x = enemy.transform.x - scroll.x;
 	enemy.screen.y = enemy.transform.y - scroll.y;
@@ -524,8 +526,8 @@ void Enemy::AttackOfFencer(int  map[MAP_HEIGHT][MAP_WIDTH]) {
 					//取得した座標の位置のマップチップがNONEであればプレイヤーの横方向のスピードが右に行くように値を入れる
 					if (map[enemy.mapColider.rightTopY][enemy.mapColider.rightTopX] == NONE && map[enemy.mapColider.rightBottomY][enemy.mapColider.rightBottomX] == NONE) {
 						enemy.speed.x += enemy.speed.tmpX;
-						enemy.angle -= (PI * 4 / 6) / 75;
 					}
+					enemy.angle -= (PI * 4 / 6) / 75;
 				}
 			}
 
@@ -537,8 +539,8 @@ void Enemy::AttackOfFencer(int  map[MAP_HEIGHT][MAP_WIDTH]) {
 					//取得した座標の位置のマップチップがNONEであればプレイヤーの横方向のスピードが左に行くように値を入れる
 					if (map[enemy.mapColider.leftTopY][enemy.mapColider.leftTopX] == NONE && map[enemy.mapColider.leftBottomY][enemy.mapColider.leftBottomX] == NONE) {
 						enemy.speed.x -= enemy.speed.tmpX;
-						enemy.angle += (PI * 4 / 6) / 75;
 					}
+					enemy.angle += (PI * 4 / 6) / 75;
 				}
 			}
 

@@ -4,7 +4,7 @@
 Player::Player() {
 	//transform
 	player.transform.x = MAP_SIZE * 2;
-	player.transform.y = MAP_SIZE * (MAP_HEIGHT - 4);
+	player.transform.y = MAP_SIZE * (MAP_HEIGHT - 5);
 	player.transform.r = 15;
 
 	//speed
