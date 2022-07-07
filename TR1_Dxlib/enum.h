@@ -14,5 +14,5 @@ enum MapData {
 enum WeaponType {
 	NOWEAPON,
 	SROWD,
-	ARROW,
+	BOW,
 };

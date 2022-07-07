@@ -1,32 +1,32 @@
 #pragma once
+#include "Vector2.h"
 
 typedef struct Transform {
 
-	double x;
-	double y;
-	double r;
+	Vector2 pos;
+	float r;
 
 }Transform;
 
 typedef struct Screen {
 
-	double x;
-	double y;
+	float x;
+	float y;
 
 }Screen;
 
 typedef struct Speed {
 
-	double fixedValue;
-	double x;
-	double y;
-	double tmpX;
-	double tmpY;
-	double initialspeedY;
+	float fixedValue;
+	float x;
+	float y;
+	float tmpX;
+	float tmpY;
+	float initialspeedY;
 
 }Speed;
 
-typedef struct MapColider {
+typedef struct MapCollider {
 
 	int rightTopX;
 	int rightTopY;
@@ -37,49 +37,76 @@ typedef struct MapColider {
 	int leftBottomX;
 	int leftBottomY;
 
-}MapColider;
+}MapCollider;
 
 typedef struct Scroll {
 
-	double x;
-	double y;
-	double MAX_X;
-	double MAX_Y;
+	float x;
+	float y;
+	float MAX_X;
+	float MAX_Y;
 
 }Scrool;
+
+typedef struct AerialController{
+
+	int isInTheAir;
+	int timer;
+
+}AerialController;
 
 typedef struct PlayerStruct {
 
 	Transform transform;
+	Transform oldTransform[5];
 	Screen screen;
 	Speed speed;
-	MapColider mapColider;
+	AerialController aerialController;
 	int isJump;
-	int isDoubleJump;
-	int isInTheAir;
-	int AirTimer;
+	int isfloatJump;
 
 }PlayerStruct;
+
+typedef struct Eye {
+	float x;
+	float y;
+	float angle;
+	float fov;
+	float range;
+	int isVisuable;
+}Eye;
+
+typedef struct Attack {
+	int isAttack;
+	int coolTime;
+	int isShot;
+	int weaponType;
+	float weaponAngle;
+	float range;
+	float amplitude;
+	float angle;
+	int motionTimer;
+	int motionPhase;
+}Attack;
+
+typedef struct Target {
+
+	float x;
+	float y;
+
+}Target;
 
 typedef struct EnemyStruct {
 
 	Transform transform;
 	Screen screen;
 	Speed speed;
-	MapColider mapColider;
-	double angle;
-	double distanceToPlayer;
-	double sensingRenge;
-	double attackRenge;
+	Attack attack;
+	AerialController aerialController;
+	Target target;
+	Eye eye;
 	int type;
 	int isFacingRight;
-	int isInTheAir;
-	int isShotArrow;
-	int AirTimer;
-	int motionTimer;
-	int motionPhase;
-	int isAttack;
-	int attackCT;
-	int weaponType;
+	float distanceToPlayer;
 
 }EnemyStruct;

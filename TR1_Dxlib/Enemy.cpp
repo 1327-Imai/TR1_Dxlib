@@ -1,4 +1,5 @@
 #include "Enemy.h"
+#include "Component.h"
 
 //コンストラクタの定義
 Enemy::Enemy(int enemyType) {
@@ -7,79 +8,92 @@ Enemy::Enemy(int enemyType) {
 
 	if (enemy.type == SLIME) {
 		//transform
-		enemy.transform.x = MAP_SIZE * 10;
-		enemy.transform.y = MAP_SIZE * ((double)MAP_HEIGHT - 3.5);
+		enemy.transform.pos.x = MAP_SIZE * 10;
+		enemy.transform.pos.y = MAP_SIZE * ((float)MAP_HEIGHT - 3.5);
 		enemy.transform.r = 15;
 
 		//speed
 		enemy.speed.fixedValue = 1;
 
-		//range
-		enemy.sensingRenge = 10 * MAP_SIZE;
-		enemy.attackRenge = 6 * MAP_SIZE;
+		//attack
+		enemy.attack.range = 5 * MAP_SIZE;
+		enemy.attack.amplitude = PI / 180 * 30;
 
-		//weapon
-		enemy.weaponType = NOWEAPON;
+		enemy.attack.weaponType = NOWEAPON;
+		weapon = new Weapon(enemy.attack.weaponType);
 
+		//eye
+		enemy.eye.range = 7 * MAP_SIZE;
+		enemy.eye.fov = PI / 180 * 110;
 	}
 
 	else if (enemy.type == FENCER) {
 		//transform
-		enemy.transform.x = MAP_SIZE * 20;
-		enemy.transform.y = MAP_SIZE * ((double)MAP_HEIGHT - 3.5);
+		enemy.transform.pos.x = MAP_SIZE * 20;
+		enemy.transform.pos.y = MAP_SIZE * ((float)MAP_HEIGHT - 3.5);
 		enemy.transform.r = 15;
 
 		//speed
 		enemy.speed.fixedValue = 2;
 
-		//range
-		enemy.sensingRenge = 10 * MAP_SIZE;
-		enemy.attackRenge = 5 * MAP_SIZE;
+		//attack
+		enemy.attack.weaponType = SROWD;
 
-		//angle
-		enemy.angle = PI * 5 / 6;
+		enemy.attack.weaponAngle = PI * 5 / 6;
+		enemy.attack.range = 5 * MAP_SIZE;
+		enemy.attack.amplitude = PI / 180 * 30;
 
-		//weapon
-		enemy.weaponType = SROWD;
+		weapon = new Weapon(enemy.attack.weaponType);
+		weapon->SetLength(32.0f);
+
+		//eye
+		enemy.eye.range = 10 * MAP_SIZE;
+		enemy.eye.fov = PI / 180 * 110;
 	}
 
 	else if (enemy.type == ARCHER) {
 		//transform
-		enemy.transform.x = MAP_SIZE * 30;
-		enemy.transform.y = MAP_SIZE * ((double)MAP_HEIGHT - 3.5);
+		enemy.transform.pos.x = MAP_SIZE * 25.5;
+		enemy.transform.pos.y = MAP_SIZE * ((float)MAP_HEIGHT - 5.5);
 		enemy.transform.r = 15;
 
 		//speed
 		enemy.speed.fixedValue = 2;
 
-		//range
-		enemy.sensingRenge = 15 * MAP_SIZE;
-		enemy.attackRenge = 9 * MAP_SIZE;
+		//attack
+		enemy.attack.weaponType = BOW;
+		enemy.attack.weaponAngle = PI;
+		enemy.attack.isShot = false;
 
-		//angle
-		enemy.angle = PI;
+		enemy.attack.range = 10 * MAP_SIZE;
+		enemy.attack.amplitude = PI / 180 * 110;
 
-		//weapon
-		enemy.weaponType = ARROW;
-		enemy.isShotArrow = false;
+		weapon = new Weapon(enemy.attack.weaponType);
+		weapon->SetSpeedFixedValue(10.0f);
+		weapon->SetLength(32.0f);
+
+		//eye
+		enemy.eye.range = 15 * MAP_SIZE;
+		enemy.eye.fov = PI / 180 * 110;
+
 	}
 
-	//weapon
-	weapon = new Weapon(enemy.weaponType);
-
 	//others
-	enemy.AirTimer = 0;
-	enemy.isInTheAir = 0;
+	enemy.aerialController.timer = 0;
+	enemy.aerialController.isInTheAir = 0;
 	enemy.isFacingRight = false;
-	enemy.attackCT = 0;
-	enemy.motionTimer = 0;
-	enemy.motionPhase = 0;
+	enemy.attack.coolTime = 0;
+	enemy.attack.motionTimer = 0;
+	enemy.attack.motionPhase = 0;
+
+	enemy.eye.x = enemy.transform.pos.x - 1;
+	enemy.eye.y = enemy.transform.pos.y - 1;
 }
 
 Enemy::Enemy(EnemyStruct enemy) {
 	this->enemy = enemy;
 
-	weapon = new Weapon(enemy.weaponType);
+	weapon = new Weapon(enemy.attack.weaponType);
 }
 
 //デストラクタの定義
@@ -92,156 +106,173 @@ void Enemy::Update(Player player , int  map[MAP_HEIGHT][MAP_WIDTH] , Scroll& scr
 
 	enemy.speed.x = 0;
 	enemy.speed.y = 0;
-	enemy.speed.tmpX = enemy.speed.fixedValue;
+	enemy.speed.tmpX = 0;
 	enemy.speed.tmpY = 0;
 
-	//敵の本来の四隅の縦方向の座標を取得する
-	enemy.mapColider.leftTopY = ((int)enemy.transform.y - (int)enemy.transform.r) / MAP_SIZE;
-	enemy.mapColider.leftBottomY = ((int)enemy.transform.y + (int)enemy.transform.r - 1) / MAP_SIZE;
-	enemy.mapColider.rightTopY = ((int)enemy.transform.y - (int)enemy.transform.r) / MAP_SIZE;
-	enemy.mapColider.rightBottomY = ((int)enemy.transform.y + (int)enemy.transform.r - 1) / MAP_SIZE;
 
-	//敵の本来の四隅の横方向の座標を取得する
-	enemy.mapColider.rightTopX = ((int)enemy.transform.x + (int)enemy.transform.r - 1) / MAP_SIZE;
-	enemy.mapColider.rightBottomX = ((int)enemy.transform.x + (int)enemy.transform.r - 1) / MAP_SIZE;
-	enemy.mapColider.leftTopX = ((int)enemy.transform.x - (int)enemy.transform.r) / MAP_SIZE;
-	enemy.mapColider.leftBottomX = ((int)enemy.transform.x - (int)enemy.transform.r) / MAP_SIZE;
-
-	if (enemy.isInTheAir == false) {
-
-		if (map[enemy.mapColider.rightBottomY + 1][enemy.mapColider.rightBottomX] == 0 &&
-			map[enemy.mapColider.leftBottomY + 1][enemy.mapColider.leftBottomX] == 0) {
-			enemy.isInTheAir = true;
-			enemy.speed.initialspeedY = 0;
-		}
-
-	}
-
+	//プレイヤーとの距離を計算する
 	enemy.distanceToPlayer = sqrt(
-		pow(player.GetPlyaerTransformX() - enemy.transform.x , 2) +
-		pow(player.GetPlyaerTransformY() - enemy.transform.y , 2)
+		pow(player.GetTransform().pos.x - enemy.transform.pos.x , 2) +
+		pow(player.GetTransform().pos.y - enemy.transform.pos.y , 2)
 	);
 
-	if (enemy.distanceToPlayer <= enemy.attackRenge) {
-		if (enemy.attackCT <= 0) {
-			enemy.isAttack = true;
+	//近く(マップチップ1マス居ない)にいれば
+	if (enemy.distanceToPlayer < MAP_SIZE) {
+
+		enemy.eye.x = player.GetTransform().pos.x;
+		enemy.eye.y = player.GetTransform().pos.y;
+
+	}
+
+	LoadComponent(player , map);
+
+	//プレイヤーとの距離が攻撃範囲より近ければ
+	if (enemy.eye.isVisuable) {
+		if (DetermineIsAttackHit()) {
+			if (enemy.attack.coolTime <= 0) {
+				//攻撃フラグをtrueにする
+				enemy.attack.isAttack = true;
+			}
 		}
 	}
 
-	if (enemy.isAttack == true) {
+	//攻撃フラグがtrueなら攻撃をする
+	if (enemy.attack.isAttack == true) {
+		Attack(player);
+	}
+
+	//そうでなければ
+	else {
+		NomalMove(player);
+	}
+
+	//重力の影響を受ける
+	Component::AffectedByGravity(enemy.speed , enemy.aerialController);
+	//マップチップとの当たり判定を行う
+	Component::MapchipCollision(enemy.transform , enemy.speed , enemy.aerialController , map);
+
+	enemy.transform.pos.x += enemy.speed.x;
+	enemy.transform.pos.y += enemy.speed.y;
+
+	//攻撃のクールタイムが0より大きいなら
+	if (0 < enemy.attack.coolTime) {
+		//クールタイムを減少
+		enemy.attack.coolTime--;
+	}
+
+	//スクリーン座標を取得
+	enemy.screen.x = enemy.transform.pos.x - scroll.x;
+	enemy.screen.y = enemy.transform.pos.y - scroll.y;
+
+	//武器の更新処理を行う
+	weapon->Update(enemy.transform , scroll , map);
+
+
+	DebugDraw(scroll);
+}
+
+int Enemy::DetermineIsAttackHit() {
+
+	Vector2 targetPos = {enemy.target.x , enemy.target.y};
+
+	Vector2 attackRangeVert1{
+		enemy.transform.pos.x + (float)cos(enemy.attack.angle + enemy.attack.amplitude / 2) * enemy.attack.range ,
+		enemy.transform.pos.y + (float)sin(enemy.attack.angle + enemy.attack.amplitude / 2) * enemy.attack.range
+	};
+
+	Vector2 attackRangeVert2{
+		enemy.transform.pos.x + (float)cos(enemy.attack.angle) * enemy.attack.range ,
+		enemy.transform.pos.y + (float)sin(enemy.attack.angle) * enemy.attack.range
+	};
+
+	Vector2 attackRangeVert3{
+		enemy.transform.pos.x + (float)cos(enemy.attack.angle - enemy.attack.amplitude / 2) * enemy.attack.range ,
+		enemy.transform.pos.y + (float)sin(enemy.attack.angle - enemy.attack.amplitude / 2) * enemy.attack.range
+	};
+
+	Vector2 crossA1 = enemy.transform.pos - attackRangeVert1;
+	Vector2 crossA2 = attackRangeVert1 - attackRangeVert2;
+	Vector2 crossA3 = attackRangeVert2 - attackRangeVert3;
+	Vector2 crossA4 = attackRangeVert3 - enemy.transform.pos;
+
+	Vector2 crossB1 = enemy.transform.pos - targetPos;
+	Vector2 crossB2 = attackRangeVert1 - targetPos;
+	Vector2 crossB3 = attackRangeVert2 - targetPos;
+	Vector2 crossB4 = attackRangeVert3 - targetPos;
+
+	if (crossA1.cross(crossB1) < 0 &&
+		crossA2.cross(crossB2) < 0 &&
+		crossA3.cross(crossB3) < 0 &&
+		crossA4.cross(crossB4) < 0) {
+
+		return 1;
+	}
+	else {
+		return 0;
+	}
+
+}
+
+void Enemy::NomalMove(Player player) {
+
+	//プレイヤーが見えていれば
+	if (enemy.eye.isVisuable) {
+
+		//プレイヤーが右にいるなら右を向く
+		if (enemy.transform.pos.x < player.GetTransform().pos.x) {
+			enemy.isFacingRight = true;
+		}
+		//そうでないなら左を向く
+		else {
+			enemy.isFacingRight = false;
+		}
+		//それぞれ移動処理を行う
 		if (enemy.type == SLIME) {
-			AttackOfSlime(map);
+			NomalMoveOfSlime();
 		}
 
 		else if (enemy.type == FENCER) {
-			AttackOfFencer(map);
+			NomalMoveOfFencer();
 		}
 
 		else if (enemy.type == ARCHER) {
-			AttackOfArcher(map , player);
+			NomalMoveOfArcher(player);
 		}
 	}
+}
 
-	else {
-		if (enemy.distanceToPlayer <= enemy.sensingRenge) {
-
-			if (enemy.transform.x < player.GetPlyaerTransformX()) {
-				enemy.isFacingRight = true;
-			}
-			else {
-				enemy.isFacingRight = false;
-			}
-
-			if (enemy.type == SLIME) {
-				MoveOfSlime(map);
-			}
-
-			else if (enemy.type == FENCER) {
-				MoveOfFencer(map);
-			}
-
-			else if (enemy.type == ARCHER) {
-				MoveOfArcher(map , player);
-			}
-		}
+void Enemy::Attack(Player player) {
+	if (enemy.type == SLIME) {
+		AttackOfSlime();
 	}
 
-	if (enemy.isInTheAir == true) {
-		if (enemy.isAttack == true) {
-			if (enemy.type != SLIME) {
-				enemy.speed.tmpY = enemy.speed.initialspeedY + (G / 50) * enemy.AirTimer;
-
-				//現在のプレイヤーの四隅の縦方向の座標に一回分進んだ場合の座標を取得
-				enemy.mapColider.leftTopY = ((int)enemy.transform.y + enemy.speed.tmpY - (int)enemy.transform.r) / MAP_SIZE;
-				enemy.mapColider.rightTopY = ((int)enemy.transform.y + enemy.speed.tmpY - (int)enemy.transform.r) / MAP_SIZE;
-				enemy.mapColider.leftBottomY = ((int)enemy.transform.y + enemy.speed.tmpY + (int)enemy.transform.r - 1) / MAP_SIZE;
-				enemy.mapColider.rightBottomY = ((int)enemy.transform.y + enemy.speed.tmpY + (int)enemy.transform.r - 1) / MAP_SIZE;
-
-				if (enemy.speed.tmpY < 0) {
-					if (map[enemy.mapColider.rightTopY][enemy.mapColider.rightTopX] == 0 &&
-						map[enemy.mapColider.leftTopY][enemy.mapColider.leftTopX] == 0) {
-						enemy.speed.y = enemy.speed.tmpY;
-					}
-					else {//天井にあたったら
-						enemy.AirTimer = 0;
-						enemy.speed.initialspeedY = 0;
-					}
-				}
-
-				else if (0 <= enemy.speed.tmpY) {
-					if (map[enemy.mapColider.rightBottomY][enemy.mapColider.rightBottomX] == 0 &&
-						map[enemy.mapColider.leftBottomY][enemy.mapColider.leftBottomX] == 0) {
-						enemy.speed.y = enemy.speed.tmpY;
-					}
-					else {
-						//地面についたら
-						enemy.isInTheAir = false;
-						enemy.AirTimer = 0;
-						enemy.transform.y = enemy.mapColider.rightBottomY * MAP_SIZE - 16;
-					}
-				}
-
-				//実際に敵を進める
-				enemy.transform.y += enemy.speed.y;
-
-				//敵の本来の四隅の縦方向の座標を取得する
-				enemy.mapColider.leftTopY = ((int)enemy.transform.y - (int)enemy.transform.r) / MAP_SIZE;
-				enemy.mapColider.leftBottomY = ((int)enemy.transform.y + (int)enemy.transform.r - 1) / MAP_SIZE;
-				enemy.mapColider.rightTopY = ((int)enemy.transform.y - (int)enemy.transform.r) / MAP_SIZE;
-				enemy.mapColider.rightBottomY = ((int)enemy.transform.y + (int)enemy.transform.r - 1) / MAP_SIZE;
-
-				enemy.AirTimer++;
-			}
-		}
+	else if (enemy.type == FENCER) {
+		AttackOfFencer(player);
 	}
 
-	if (0 <= enemy.attackCT) {
-		enemy.attackCT--;
+	else if (enemy.type == ARCHER) {
+		AttackOfArcher(player);
 	}
-	enemy.screen.x = enemy.transform.x - scroll.x;
-	enemy.screen.y = enemy.transform.y - scroll.y;
+}
 
-	weapon->Update(enemy.transform.x , enemy.transform.y , enemy.angle , scroll , map);
+void Enemy::LoadComponent(Player player , int  map[MAP_HEIGHT][MAP_WIDTH]) {
+
+	if (enemy.type == SLIME) {
+		LoadComponentOfSlime(player , map);
+	}
+
+	else if (enemy.type == FENCER) {
+		LoadComponentOfFencer(player , map);
+	}
+
+	else if (enemy.type == ARCHER) {
+		LoadComponentOfArcher(player , map);
+	}
 
 }
 
 void Enemy::Draw() {
 
-#pragma region//デバッグ用:攻撃範囲の表示
-	//SetDrawBlendMode(DX_BLENDMODE_ALPHA , 30);
-	//DrawCircle(enemy.screen.x ,
-	//		   enemy.screen.y ,
-	//		   enemy.sensingRenge ,
-	//		   GetColor(200 , 0 , 0) ,
-	//		   true);
-
-	//DrawCircle(enemy.screen.x ,
-	//		   enemy.screen.y ,
-	//		   enemy.attackRenge ,
-	//		   GetColor(0 , 200 , 0) ,
-	//		   true);
-	//SetDrawBlendMode(DX_BLENDMODE_NOBLEND , 30);
-#pragma endregion////デバッグ用:攻撃範囲の表示
 
 	if (enemy.type == SLIME) {
 		DrawOfSlime();
@@ -260,158 +291,57 @@ void Enemy::Draw() {
 
 #pragma region//スライム
 
-void Enemy::MoveOfSlime(int  map[MAP_HEIGHT][MAP_WIDTH]) {
+void Enemy::NomalMoveOfSlime() {
 
-	if (enemy.isInTheAir == false) {
 
-		if (enemy.transform.x + enemy.transform.r < MAP_WIDTH * MAP_SIZE) {//プレイヤーが右端より左にいるとき
-			if (enemy.isFacingRight == true) {//右を向いていなかったら
-				//現在のプレイヤーの右上、右下の頂点に一回分右方向に進んだ場合の座標を取得
-				enemy.mapColider.rightTopX = (enemy.transform.x + enemy.speed.tmpX + enemy.transform.r - 1) / MAP_SIZE;
-				enemy.mapColider.rightBottomX = (enemy.transform.x + enemy.speed.tmpX + enemy.transform.r - 1) / MAP_SIZE;
-				//取得した座標の位置のマップチップがNONEであればプレイヤーの横方向のスピードが右に行くように値を入れる
-				if (map[enemy.mapColider.rightTopY][enemy.mapColider.rightTopX] == NONE && map[enemy.mapColider.rightBottomY][enemy.mapColider.rightBottomX] == NONE) {
-					enemy.speed.x += enemy.speed.fixedValue;
-				}
-			}
-		}
-
-		if (enemy.transform.x + enemy.transform.r < MAP_WIDTH * MAP_SIZE) {//プレイヤーが右端より左にいるとき
-			if (enemy.isFacingRight == false) {//右を向いなかったら
-				//現在のプレイヤーの左上、左下の頂点に一回分左方向に進んだ場合の座標を取得
-				enemy.mapColider.leftTopX = (enemy.transform.x - enemy.speed.tmpX - enemy.transform.r) / MAP_SIZE;
-				enemy.mapColider.leftBottomX = (enemy.transform.x - enemy.speed.tmpX - enemy.transform.r) / MAP_SIZE;
-				//取得した座標の位置のマップチップがNONEであればプレイヤーの横方向のスピードが左に行くように値を入れる
-				if (map[enemy.mapColider.leftTopY][enemy.mapColider.leftTopX] == NONE && map[enemy.mapColider.leftBottomY][enemy.mapColider.leftBottomX] == NONE) {
-					enemy.speed.x -= enemy.speed.fixedValue;
-				}
-			}
-		}
-
-		//実際にプレイヤーを進める
-		enemy.transform.x += enemy.speed.x;
-
-		//プレイヤーの本来の四隅の横方向の座標を取得する
-		enemy.mapColider.rightTopX = (enemy.transform.x + enemy.transform.r - 1) / MAP_SIZE;
-		enemy.mapColider.rightBottomX = (enemy.transform.x + enemy.transform.r - 1) / MAP_SIZE;
-		enemy.mapColider.leftTopX = (enemy.transform.x - enemy.transform.r) / MAP_SIZE;
-		enemy.mapColider.leftBottomX = (enemy.transform.x - enemy.transform.r) / MAP_SIZE;
+	if (enemy.isFacingRight == true) {
+		enemy.speed.tmpX = enemy.speed.fixedValue;
 	}
+	else {
+		enemy.speed.tmpX = -enemy.speed.fixedValue;
+	}
+
 }
 
-void Enemy::AttackOfSlime(int  map[MAP_HEIGHT][MAP_WIDTH]) {
+void Enemy::AttackOfSlime() {
 
-	if (enemy.motionPhase == 0) {
+	if (enemy.attack.motionPhase == 0) {
 		enemy.speed.initialspeedY = -3;
-		enemy.speed.fixedValue = 5;
-		enemy.isInTheAir = true;
-		enemy.AirTimer = 0;
-		enemy.motionTimer = 25;
-		enemy.motionPhase++;
+		enemy.attack.motionTimer = 25;
+		enemy.attack.motionPhase++;
 	}
 
-	else if (enemy.motionPhase == 1) {
-		enemy.motionTimer--;
-		if (enemy.motionTimer <= 0) {
-			enemy.motionPhase++;
+	else if (enemy.attack.motionPhase == 1) {
+		enemy.attack.motionTimer--;
+		if (enemy.attack.motionTimer <= 0) {
+			enemy.attack.motionPhase++;
+			enemy.aerialController.isInTheAir = true;
+			enemy.aerialController.timer = 0;
 		}
 	}
 
-	else if (enemy.motionPhase == 2) {
+	else if (enemy.attack.motionPhase == 2) {
 
-		enemy.speed.tmpY = enemy.speed.initialspeedY + (G / 50) * enemy.AirTimer;
-
-		//現在のスライムの四隅の縦方向の座標に一回分進んだ場合の座標を取得
-		enemy.mapColider.leftTopY = ((int)enemy.transform.y + enemy.speed.tmpY - (int)enemy.transform.r) / MAP_SIZE;
-		enemy.mapColider.rightTopY = ((int)enemy.transform.y + enemy.speed.tmpY - (int)enemy.transform.r) / MAP_SIZE;
-		enemy.mapColider.leftBottomY = ((int)enemy.transform.y + enemy.speed.tmpY + (int)enemy.transform.r - 1) / MAP_SIZE;
-		enemy.mapColider.rightBottomY = ((int)enemy.transform.y + enemy.speed.tmpY + (int)enemy.transform.r - 1) / MAP_SIZE;
-
-		if (enemy.speed.tmpY < 0) {
-			if (map[enemy.mapColider.rightTopY][enemy.mapColider.rightTopX] == 0 &&
-				map[enemy.mapColider.leftTopY][enemy.mapColider.leftTopX] == 0) {
-				enemy.speed.y = enemy.speed.tmpY;
-			}
-			//天井に当たったとき
-			else {
-				enemy.AirTimer = 0;
-				enemy.speed.initialspeedY = 0;
-			}
+		if (enemy.isFacingRight == true) {
+			enemy.speed.tmpX = enemy.speed.fixedValue * 5;
+		}
+		else {
+			enemy.speed.tmpX = -enemy.speed.fixedValue * 5;
 		}
 
-		else if (0 <= enemy.speed.tmpY) {
-			if (map[enemy.mapColider.rightBottomY][enemy.mapColider.rightBottomX] == 0 &&
-				map[enemy.mapColider.leftBottomY][enemy.mapColider.leftBottomX] == 0) {
-				enemy.speed.y = enemy.speed.tmpY;
-			}
-			//地面に付いたら
-			else {
-				enemy.isInTheAir = false;
-				enemy.AirTimer = 0;
-				enemy.transform.y = enemy.mapColider.rightBottomY * MAP_SIZE - 16;
-				enemy.motionPhase++;
-				enemy.motionTimer = 30;
-			}
+		if (enemy.aerialController.isInTheAir == false) {
+			enemy.attack.motionPhase++;
+			enemy.attack.motionTimer = 30;
 		}
 
-		//実際にスライムを進める
-		enemy.transform.y += enemy.speed.y;
-
-		//スライムの本来の四隅の縦方向の座標を取得する
-		enemy.mapColider.leftTopY = ((int)enemy.transform.y - (int)enemy.transform.r) / MAP_SIZE;
-		enemy.mapColider.leftBottomY = ((int)enemy.transform.y + (int)enemy.transform.r - 1) / MAP_SIZE;
-		enemy.mapColider.rightTopY = ((int)enemy.transform.y - (int)enemy.transform.r) / MAP_SIZE;
-		enemy.mapColider.rightBottomY = ((int)enemy.transform.y + (int)enemy.transform.r - 1) / MAP_SIZE;
-
-		if (enemy.transform.x + enemy.transform.r < MAP_WIDTH * MAP_SIZE) {//スライムが右端より左にいるとき
-			if (enemy.isFacingRight == true) {//右を向いていたら
-				//現在のスライムの右上、右下の頂点に一回分右方向に進んだ場合の座標を取得
-				enemy.mapColider.rightTopX = (enemy.transform.x + enemy.speed.tmpX + enemy.transform.r - 1) / MAP_SIZE;
-				enemy.mapColider.rightBottomX = (enemy.transform.x + enemy.speed.tmpX + enemy.transform.r - 1) / MAP_SIZE;
-				//取得した座標の位置のマップチップがNONEであればスライムの横方向のスピードが右に行くように値を入れる
-				if (map[enemy.mapColider.rightTopY][enemy.mapColider.rightTopX] == NONE && map[enemy.mapColider.rightBottomY][enemy.mapColider.rightBottomX] == NONE) {
-					enemy.speed.x += enemy.speed.fixedValue;
-				}
-				else {//壁に当たったら
-					enemy.transform.x = enemy.mapColider.rightBottomX * MAP_SIZE - 16;
-					enemy.speed.fixedValue = 0;
-				}
-			}
-		}
-
-		if (enemy.transform.x + enemy.transform.r < MAP_WIDTH * MAP_SIZE) {//スライムが右端より左にいるとき
-			if (enemy.isFacingRight == false) {//右を向いなかったら
-				//現在のスライムの左上、左下の頂点に一回分左方向に進んだ場合の座標を取得
-				enemy.mapColider.leftTopX = (enemy.transform.x - enemy.speed.tmpX - enemy.transform.r) / MAP_SIZE;
-				enemy.mapColider.leftBottomX = (enemy.transform.x - enemy.speed.tmpX - enemy.transform.r) / MAP_SIZE;
-				//取得した座標の位置のマップチップがNONEであればスライムの横方向のスピードが左に行くように値を入れる
-				if (map[enemy.mapColider.leftTopY][enemy.mapColider.leftTopX] == NONE && map[enemy.mapColider.leftBottomY][enemy.mapColider.leftBottomX] == NONE) {
-					enemy.speed.x -= enemy.speed.fixedValue;
-				}
-				else {//壁に当たったら
-					enemy.transform.x = enemy.mapColider.rightBottomX * MAP_SIZE + 15;
-					enemy.speed.fixedValue = 0;
-				}
-			}
-		}
-
-		//実際にスライムを進める
-		enemy.transform.x += enemy.speed.x;
-
-		//スライムの本来の四隅の横方向の座標を取得する
-		enemy.mapColider.rightTopX = ((int)enemy.transform.x + (int)enemy.transform.r - 1) / MAP_SIZE;
-		enemy.mapColider.rightBottomX = ((int)enemy.transform.x + (int)enemy.transform.r - 1) / MAP_SIZE;
-		enemy.mapColider.leftTopX = ((int)enemy.transform.x - (int)enemy.transform.r) / MAP_SIZE;
-		enemy.mapColider.leftBottomX = ((int)enemy.transform.x - (int)enemy.transform.r) / MAP_SIZE;
-
-		enemy.AirTimer++;
 	}
-	else if (enemy.motionPhase == 3) {
-		enemy.motionTimer--;
-		if (enemy.motionTimer <= 0) {
-			enemy.isAttack = false;
-			enemy.motionPhase = 0;
-			enemy.attackCT = 5;
+
+	else if (enemy.attack.motionPhase == 3) {
+		enemy.attack.motionTimer--;
+		if (enemy.attack.motionTimer <= 0) {
+			enemy.attack.isAttack = false;
+			enemy.attack.motionPhase = 0;
+			enemy.attack.coolTime = 5;
 			enemy.speed.fixedValue = 1;
 		}
 	}
@@ -426,8 +356,10 @@ void Enemy::DrawOfSlime() {
 
 	if (enemy.isFacingRight == true) {
 
-		DrawBox(enemy.screen.x - enemy.transform.r / 2 , enemy.screen.y + enemy.transform.r ,
-				enemy.screen.x , enemy.screen.y - enemy.transform.r ,
+		DrawBox(enemy.screen.x - enemy.transform.r / 2 ,
+				enemy.screen.y + enemy.transform.r ,
+				enemy.screen.x ,
+				enemy.screen.y - enemy.transform.r ,
 				GetColor(200 , 50 , 50) ,
 				true);
 
@@ -453,244 +385,196 @@ void Enemy::DrawOfSlime() {
 	}
 }
 
+void Enemy::LoadComponentOfSlime(Player player , int  map[MAP_HEIGHT][MAP_WIDTH]) {
+	Component::Enemy::Serch::TrackWithEyes(enemy.eye , enemy.transform , player , map);
+	Component::Enemy::Attack::PredictMovement(0 , enemy.target , player);
+	Component::Enemy::Attack::InversionAttackAngleBasedFace(enemy.attack.angle , enemy.isFacingRight);
+}
+
 #pragma endregion//スライム
 
 #pragma region//フェンサー
 
-void Enemy::MoveOfFencer(int  map[MAP_HEIGHT][MAP_WIDTH]) {
+void Enemy::NomalMoveOfFencer() {
 
-	if (enemy.isInTheAir == false) {
-
-		if (enemy.transform.x + enemy.transform.r < MAP_WIDTH * MAP_SIZE) {//プレイヤーが右端より左にいるとき
-			if (enemy.isFacingRight == true) {//右を向いていなかったら
-				//現在のプレイヤーの右上、右下の頂点に一回分右方向に進んだ場合の座標を取得
-				enemy.mapColider.rightTopX = (enemy.transform.x + enemy.speed.tmpX + enemy.transform.r - 1) / MAP_SIZE;
-				enemy.mapColider.rightBottomX = (enemy.transform.x + enemy.speed.tmpX + enemy.transform.r - 1) / MAP_SIZE;
-				//取得した座標の位置のマップチップがNONEであればプレイヤーの横方向のスピードが右に行くように値を入れる
-				if (map[enemy.mapColider.rightTopY][enemy.mapColider.rightTopX] == NONE && map[enemy.mapColider.rightBottomY][enemy.mapColider.rightBottomX] == NONE) {
-					enemy.speed.x += enemy.speed.fixedValue;
-				}
-			}
-		}
-
-		if (enemy.transform.x + enemy.transform.r < MAP_WIDTH * MAP_SIZE) {//プレイヤーが右端より左にいるとき
-			if (enemy.isFacingRight == false) {//右を向いなかったら
-				//現在のプレイヤーの左上、左下の頂点に一回分左方向に進んだ場合の座標を取得
-				enemy.mapColider.leftTopX = (enemy.transform.x - enemy.speed.tmpX - enemy.transform.r) / MAP_SIZE;
-				enemy.mapColider.leftBottomX = (enemy.transform.x - enemy.speed.tmpX - enemy.transform.r) / MAP_SIZE;
-				//取得した座標の位置のマップチップがNONEであればプレイヤーの横方向のスピードが左に行くように値を入れる
-				if (map[enemy.mapColider.leftTopY][enemy.mapColider.leftTopX] == NONE && map[enemy.mapColider.leftBottomY][enemy.mapColider.leftBottomX] == NONE) {
-					enemy.speed.x -= enemy.speed.fixedValue;
-				}
-			}
-		}
-
-		//実際にプレイヤーを進める
-		enemy.transform.x += enemy.speed.x;
-
-		//プレイヤーの本来の四隅の横方向の座標を取得する
-		enemy.mapColider.rightTopX = (enemy.transform.x + enemy.transform.r - 1) / MAP_SIZE;
-		enemy.mapColider.rightBottomX = (enemy.transform.x + enemy.transform.r - 1) / MAP_SIZE;
-		enemy.mapColider.leftTopX = (enemy.transform.x - enemy.transform.r) / MAP_SIZE;
-		enemy.mapColider.leftBottomX = (enemy.transform.x - enemy.transform.r) / MAP_SIZE;
+	if (enemy.isFacingRight == true) {
+		enemy.speed.tmpX = enemy.speed.fixedValue;
+	}
+	else {
+		enemy.speed.tmpX = -enemy.speed.fixedValue;
 	}
 
 	if (enemy.isFacingRight == true) {
-		enemy.angle = PI / 6;
+		enemy.attack.weaponAngle = PI / 6;
 	}
 	else {
-		enemy.angle = PI * 5 / 6;
+		enemy.attack.weaponAngle = PI * 5 / 6;
 	}
-
+	weapon->SetAngle(enemy.attack.weaponAngle);
 }
 
-void Enemy::AttackOfFencer(int  map[MAP_HEIGHT][MAP_WIDTH]) {
-	if (enemy.motionPhase == 0) {
-		if (enemy.distanceToPlayer < enemy.attackRenge / 2) {
-			enemy.motionPhase = 4;
+void Enemy::AttackOfFencer(Player player) {
+	if (enemy.attack.motionPhase == 0) {
+		if (enemy.distanceToPlayer < weapon->GetLength() + enemy.transform.r + player.GetTransform().r) {
+			enemy.attack.motionPhase = 4;
 		}
 		else {
-			enemy.motionPhase = 1;
+			enemy.attack.motionPhase = 1;
 		}
 	}
 #pragma region//攻撃パターン1
-	else if (enemy.motionPhase == 1) {
-		enemy.speed.tmpX = (enemy.speed.fixedValue + 1) - (0.04 * (double)enemy.motionTimer);
+	else if (enemy.attack.motionPhase == 1) {
+		enemy.speed.tmpX = (enemy.speed.fixedValue + 1) - (0.04 * (float)enemy.attack.motionTimer);
 
 		if (0 < enemy.speed.tmpX) {
-			if (enemy.transform.x + enemy.transform.r < MAP_WIDTH * MAP_SIZE) {//プレイヤーが右端より左にいるとき
-				if (enemy.isFacingRight == true) {//右を向いていたら
-					//現在のプレイヤーの右上、右下の頂点に一回分右方向に進んだ場合の座標を取得
-					enemy.mapColider.rightTopX = (enemy.transform.x + enemy.speed.tmpX + enemy.transform.r - 1) / MAP_SIZE;
-					enemy.mapColider.rightBottomX = (enemy.transform.x + enemy.speed.tmpX + enemy.transform.r - 1) / MAP_SIZE;
-					//取得した座標の位置のマップチップがNONEであればプレイヤーの横方向のスピードが右に行くように値を入れる
-					if (map[enemy.mapColider.rightTopY][enemy.mapColider.rightTopX] == NONE && map[enemy.mapColider.rightBottomY][enemy.mapColider.rightBottomX] == NONE) {
-						enemy.speed.x += enemy.speed.tmpX;
-					}
-					enemy.angle -= (PI * 4 / 6) / 75;
-				}
-			}
-
-			if (enemy.transform.x + enemy.transform.r < MAP_WIDTH * MAP_SIZE) {//プレイヤーが右端より左にいるとき
-				if (enemy.isFacingRight == false) {//右を向いなかったら
-					//現在のプレイヤーの左上、左下の頂点に一回分左方向に進んだ場合の座標を取得
-					enemy.mapColider.leftTopX = (enemy.transform.x - enemy.speed.tmpX - enemy.transform.r) / MAP_SIZE;
-					enemy.mapColider.leftBottomX = (enemy.transform.x - enemy.speed.tmpX - enemy.transform.r) / MAP_SIZE;
-					//取得した座標の位置のマップチップがNONEであればプレイヤーの横方向のスピードが左に行くように値を入れる
-					if (map[enemy.mapColider.leftTopY][enemy.mapColider.leftTopX] == NONE && map[enemy.mapColider.leftBottomY][enemy.mapColider.leftBottomX] == NONE) {
-						enemy.speed.x -= enemy.speed.tmpX;
-					}
-					enemy.angle += (PI * 4 / 6) / 75;
-				}
-			}
-
-			//実際にプレイヤーを進める
-			enemy.transform.x += enemy.speed.x;
-
-			//プレイヤーの本来の四隅の横方向の座標を取得する
-			enemy.mapColider.rightTopX = (enemy.transform.x + enemy.transform.r - 1) / MAP_SIZE;
-			enemy.mapColider.rightBottomX = (enemy.transform.x + enemy.transform.r - 1) / MAP_SIZE;
-			enemy.mapColider.leftTopX = (enemy.transform.x - enemy.transform.r) / MAP_SIZE;
-			enemy.mapColider.leftBottomX = (enemy.transform.x - enemy.transform.r) / MAP_SIZE;
-		}
-
-		else {
-			enemy.motionPhase++;
-			enemy.motionTimer = 0;
-		}
-
-		enemy.motionTimer++;
-	}
-
-	else if (enemy.motionPhase == 2) {
-		if (enemy.motionTimer <= 4) {
-			if (enemy.isFacingRight == true) {
-				enemy.angle += (PI / 6);
+			if (enemy.isFacingRight == false) {
+				enemy.speed.tmpX *= -1;
+				enemy.attack.weaponAngle += (PI * 4 / 6) / 75;
 			}
 			else {
-				enemy.angle -= (PI / 6);
+				enemy.attack.weaponAngle -= (PI * 4 / 6) / 75;
 			}
-			enemy.motionTimer++;
+		}
+
+		else {
+			enemy.attack.motionPhase++;
+			enemy.attack.motionTimer = 0;
+		}
+
+		enemy.attack.motionTimer++;
+	}
+
+	else if (enemy.attack.motionPhase == 2) {
+		if (enemy.attack.motionTimer <= 4) {
+			if (enemy.isFacingRight == true) {
+				enemy.attack.weaponAngle += (PI / 6);
+			}
+			else {
+				enemy.attack.weaponAngle -= (PI / 6);
+			}
+			enemy.attack.motionTimer++;
 		}
 		else {
-			enemy.motionTimer = 40;
-			enemy.motionPhase++;
+			enemy.attack.motionTimer = 40;
+			enemy.attack.motionPhase++;
 		}
 	}
-	else if (enemy.motionPhase == 3) {
-		if (0 <= enemy.motionTimer) {
-			enemy.motionTimer--;
+	else if (enemy.attack.motionPhase == 3) {
+		if (0 <= enemy.attack.motionTimer) {
+			enemy.attack.motionTimer--;
 		}
 		else {
-			enemy.motionPhase = 0;
-			enemy.motionTimer = 0;
-			enemy.isAttack = false;
-			enemy.attackCT = 5;
+			enemy.attack.motionPhase = 0;
+			enemy.attack.motionTimer = 0;
+			enemy.attack.isAttack = false;
+			enemy.attack.coolTime = 5;
 		}
 	}
 #pragma endregion//攻撃パターン1
 
 #pragma region//攻撃パターン2
 
-	else if (enemy.motionPhase == 4) {
-		if (enemy.motionTimer <= 6) {
+	else if (enemy.attack.motionPhase == 4) {
+		if (enemy.attack.motionTimer <= 6) {
 			if (enemy.isFacingRight == true) {
-				enemy.angle -= (PI / 12);
+				enemy.attack.weaponAngle -= (PI / 12);
 			}
 			else {
-				enemy.angle += (PI / 12);
+				enemy.attack.weaponAngle += (PI / 12);
 			}
-			enemy.motionTimer++;
+			enemy.attack.motionTimer++;
 		}
 		else {
-			enemy.motionTimer = 0;
-			enemy.motionPhase++;
+			enemy.attack.motionTimer = 0;
+			enemy.attack.motionPhase++;
 		}
 	}
 
-	else if (enemy.motionPhase == 5) {
-		if (enemy.motionTimer <= 6) {
+	else if (enemy.attack.motionPhase == 5) {
+		if (enemy.attack.motionTimer <= 6) {
 			if (enemy.isFacingRight == true) {
-				enemy.angle += (PI / 12);
+				enemy.attack.weaponAngle += (PI / 12);
 			}
 			else {
-				enemy.angle -= (PI / 12);
+				enemy.attack.weaponAngle -= (PI / 12);
 			}
-			enemy.motionTimer++;
+			enemy.attack.motionTimer++;
 		}
 		else {
-			enemy.motionTimer = 0;
-			enemy.motionPhase++;
+			enemy.attack.motionTimer = 0;
+			enemy.attack.motionPhase++;
 		}
 	}
 
-	else if (enemy.motionPhase == 6) {
-		if (enemy.motionTimer <= 6) {
+	else if (enemy.attack.motionPhase == 6) {
+		if (enemy.attack.motionTimer <= 6) {
 			if (enemy.isFacingRight == true) {
-				enemy.angle -= (PI / 12);
+				enemy.attack.weaponAngle -= (PI / 12);
 			}
 			else {
-				enemy.angle += (PI / 12);
+				enemy.attack.weaponAngle += (PI / 12);
 			}
-			enemy.motionTimer++;
+			enemy.attack.motionTimer++;
 		}
 		else {
-			enemy.motionTimer = 0;
-			enemy.motionPhase++;
+			enemy.attack.motionTimer = 0;
+			enemy.attack.motionPhase++;
 		}
 	}
 
-	else if (enemy.motionPhase == 7) {
-		if (enemy.motionTimer <= 6) {
+	else if (enemy.attack.motionPhase == 7) {
+		if (enemy.attack.motionTimer <= 6) {
 			if (enemy.isFacingRight == true) {
-				enemy.angle += (PI / 12);
+				enemy.attack.weaponAngle += (PI / 12);
 			}
 			else {
-				enemy.angle -= (PI / 12);
+				enemy.attack.weaponAngle -= (PI / 12);
 			}
-			enemy.motionTimer++;
+			enemy.attack.motionTimer++;
 		}
 		else {
-			enemy.motionTimer = 0;
-			enemy.motionPhase++;
+			enemy.attack.motionTimer = 0;
+			enemy.attack.motionPhase++;
 		}
 	}
 
-	else if (enemy.motionPhase == 8) {
-		if (enemy.motionTimer <= 6) {
+	else if (enemy.attack.motionPhase == 8) {
+		if (enemy.attack.motionTimer <= 6) {
 			if (enemy.isFacingRight == true) {
-				enemy.angle -= (PI / 12);
+				enemy.attack.weaponAngle -= (PI / 12);
 			}
 			else {
-				enemy.angle += (PI / 12);
+				enemy.attack.weaponAngle += (PI / 12);
 			}
-			enemy.motionTimer++;
+			enemy.attack.motionTimer++;
 		}
 		else {
-			enemy.motionTimer = 50;
-			enemy.motionPhase++;
+			enemy.attack.motionTimer = 50;
+			enemy.attack.motionPhase++;
 		}
 	}
 
-	else if (enemy.motionPhase == 9) {
-		if (0 <= enemy.motionTimer) {
-			enemy.motionTimer--;
-			if (enemy.motionTimer <= 30) {
+	else if (enemy.attack.motionPhase == 9) {
+		if (0 <= enemy.attack.motionTimer) {
+			enemy.attack.motionTimer--;
+			if (enemy.attack.motionTimer <= 30) {
 				if (enemy.isFacingRight == true) {
-					enemy.angle += (PI * 6 / 12) / 28;
+					enemy.attack.weaponAngle += (PI * 6 / 12) / 28;
 				}
 				else {
-					enemy.angle -= (PI * 6 / 12) / 28;
+					enemy.attack.weaponAngle -= (PI * 6 / 12) / 28;
 				}
 			}
 		}
 		else {
-			enemy.motionPhase = 0;
-			enemy.motionTimer = 0;
-			enemy.isAttack = false;
-			enemy.attackCT = 5;
+			enemy.attack.motionPhase = 0;
+			enemy.attack.motionTimer = 0;
+			enemy.attack.isAttack = false;
+			enemy.attack.coolTime = 5;
 		}
 	}
+
+	weapon->SetAngle(enemy.attack.weaponAngle);
 
 #pragma endregion//攻撃パターン2
 
@@ -706,58 +590,68 @@ void Enemy::DrawOfFencer() {
 
 }
 
+void Enemy::LoadComponentOfFencer(Player player , int  map[MAP_HEIGHT][MAP_WIDTH]) {
+
+	Component::Enemy::Serch::TrackWithEyes(enemy.eye , enemy.transform , player , map);
+	Component::Enemy::Attack::PredictMovement(0 , enemy.target , player);
+	Component::Enemy::Attack::InversionAttackAngleBasedFace(enemy.attack.angle , enemy.isFacingRight);
+
+}
+
 #pragma endregion//フェンサー
 
 #pragma region//アーチャー
 
-void Enemy::MoveOfArcher(int  map[MAP_HEIGHT][MAP_WIDTH] , Player player) {
+void Enemy::NomalMoveOfArcher(Player player) {
 
 	if (enemy.isFacingRight == true) {
-		enemy.angle = 0;
+		enemy.attack.weaponAngle = 0;
 	}
 	else {
-		enemy.angle = PI;
+		enemy.attack.weaponAngle = PI;
 	}
-
 }
 
-void Enemy::AttackOfArcher(int  map[MAP_HEIGHT][MAP_WIDTH] , Player player) {
+void Enemy::AttackOfArcher(Player player) {
 
-	if (enemy.motionPhase == 0) {
-		enemy.motionTimer = 50;
-		enemy.motionPhase++;
+	if (enemy.attack.motionPhase == 0) {
+		enemy.attack.motionTimer = 50;
+		enemy.attack.motionPhase++;
 	}
 
-	else if (enemy.motionPhase == 1) {
-		enemy.angle = atan2((double)player.GetPlyaerTransformY() - enemy.transform.y ,
-							(double)player.GetPlyaerTransformX() - enemy.transform.x);
+	else if (enemy.attack.motionPhase == 1) {
 
-		if (0 < enemy.motionTimer) {
-			enemy.motionTimer--;
+		enemy.attack.weaponAngle = atan2((float)enemy.target.y - enemy.transform.pos.y ,
+										 (float)enemy.target.x - enemy.transform.pos.x);
+
+		weapon->SetAngle(enemy.attack.weaponAngle);
+
+		if (0 < enemy.attack.motionTimer) {
+			enemy.attack.motionTimer--;
 		}
 		else {
-			enemy.motionPhase++;
-			enemy.motionTimer = 200;
-			enemy.isShotArrow = true;
-			weapon->SetIsShot(enemy.isShotArrow);
+			enemy.attack.motionPhase++;
+			enemy.attack.motionTimer = 200;
+			enemy.attack.isShot = true;
+			weapon->SetIsShot(enemy.attack.isShot);
 		}
 	}
 
-	else if (enemy.motionPhase == 2) {
+	else if (enemy.attack.motionPhase == 2) {
 
-		if (enemy.isShotArrow == true) {
-			if (0 < enemy.motionTimer) {
-				enemy.motionTimer--;
+		if (enemy.attack.isShot == true) {
+			if (0 < enemy.attack.motionTimer) {
+				enemy.attack.motionTimer--;
 			}
 			else {
-				enemy.isShotArrow = false;
-				weapon->SetIsShot(enemy.isShotArrow);
+				enemy.attack.isShot = false;
+				weapon->SetIsShot(enemy.attack.isShot);
 			}
 		}
-		else if (enemy.isShotArrow == false) {
-			enemy.motionPhase = 0;
-			enemy.attackCT = 100;
-			enemy.isAttack = false;
+		else if (enemy.attack.isShot == false) {
+			enemy.attack.motionPhase = 0;
+			enemy.attack.coolTime = 100;
+			enemy.attack.isAttack = false;
 		}
 
 	}
@@ -772,15 +666,81 @@ void Enemy::DrawOfArcher() {
 			   GetColor(200 , 50 , 50) ,
 			   true);
 
-	DrawTriangle(enemy.screen.x + cos(enemy.angle) * enemy.transform.r * 2 ,
-				 enemy.screen.y + sin(enemy.angle) * enemy.transform.r * 2 ,
-				 enemy.screen.x + cos(enemy.angle) * enemy.transform.r + cos(enemy.angle + PI / 2) * enemy.transform.r ,
-				 enemy.screen.y + sin(enemy.angle) * enemy.transform.r + sin(enemy.angle + PI / 2) * enemy.transform.r ,
-				 enemy.screen.x + cos(enemy.angle) * enemy.transform.r - cos(enemy.angle + PI / 2) * enemy.transform.r ,
-				 enemy.screen.y + sin(enemy.angle) * enemy.transform.r - sin(enemy.angle + PI / 2) * enemy.transform.r ,
+	DrawTriangle(enemy.screen.x + (float)cos(enemy.attack.weaponAngle) * enemy.transform.r * 2 ,
+				 enemy.screen.y + (float)sin(enemy.attack.weaponAngle) * enemy.transform.r * 2 ,
+				 enemy.screen.x + (float)cos(enemy.attack.weaponAngle) * enemy.transform.r + (float)cos(enemy.attack.weaponAngle + PI / 2) * enemy.transform.r ,
+				 enemy.screen.y + (float)sin(enemy.attack.weaponAngle) * enemy.transform.r + (float)sin(enemy.attack.weaponAngle + PI / 2) * enemy.transform.r ,
+				 enemy.screen.x + (float)cos(enemy.attack.weaponAngle) * enemy.transform.r - (float)cos(enemy.attack.weaponAngle + PI / 2) * enemy.transform.r ,
+				 enemy.screen.y + (float)sin(enemy.attack.weaponAngle) * enemy.transform.r - (float)sin(enemy.attack.weaponAngle + PI / 2) * enemy.transform.r ,
 				 GetColor(200 , 50 , 50) ,
 				 false);
 
 }
 
+void Enemy::LoadComponentOfArcher(Player player , int  map[MAP_HEIGHT][MAP_WIDTH]) {
+
+	Component::Enemy::Serch::TrackWithEyes(enemy.eye , enemy.transform , player , map);
+	Component::Enemy::Attack::PredictMovement(weapon->GetSpeed() , enemy.distanceToPlayer , enemy.target , player);
+	Component::Enemy::Attack::SetAttackAngleSameAsEyeAngle(enemy.attack.angle , enemy.eye.angle);
+
+}
+
 #pragma endregion//アーチャー
+
+void Enemy::DebugDraw(Scroll scroll) {
+	SetDrawBlendMode(DX_BLENDMODE_ALPHA , 100);
+
+#pragma region//DetermineIsAttackHit
+	Vector2 attackRangeVert1{
+		enemy.transform.pos.x + (float)cos(enemy.attack.angle + enemy.attack.amplitude / 2) * enemy.attack.range ,
+		enemy.transform.pos.y + (float)sin(enemy.attack.angle + enemy.attack.amplitude / 2) * enemy.attack.range
+	};
+
+	Vector2 attackRangeVert2{
+		enemy.transform.pos.x + (float)cos(enemy.attack.angle) * enemy.attack.range ,
+		enemy.transform.pos.y + (float)sin(enemy.attack.angle) * enemy.attack.range
+	};
+
+	Vector2 attackRangeVert3{
+		enemy.transform.pos.x + (float)cos(enemy.attack.angle - enemy.attack.amplitude / 2) * enemy.attack.range ,
+		enemy.transform.pos.y + (float)sin(enemy.attack.angle - enemy.attack.amplitude / 2) * enemy.attack.range
+	};
+
+	DrawTriangle(enemy.transform.pos.x - scroll.x , enemy.transform.pos.y - scroll.y ,
+				 attackRangeVert1.x - scroll.x , attackRangeVert1.y - scroll.y ,
+				 attackRangeVert2.x - scroll.x , attackRangeVert2.y - scroll.y ,
+				 GetColor(255 , 255 , 0) , true);
+	DrawTriangle(enemy.transform.pos.x - scroll.x , enemy.transform.pos.y - scroll.y ,
+				 attackRangeVert3.x - scroll.x , attackRangeVert3.y - scroll.y ,
+				 attackRangeVert2.x - scroll.x , attackRangeVert2.y - scroll.y ,
+				 GetColor(255 , 255 , 0) , true);
+#pragma endregion
+
+	//target
+	DrawCircle(enemy.target.x - scroll.x , enemy.target.y - scroll.y , 20 , GetColor(255 , 255 , 0) , false);
+
+#pragma region//TrackWithEyes
+	Vector2 fovCenter{
+		enemy.transform.pos.x + (float)cos(enemy.eye.angle) * enemy.eye.range ,
+		enemy.transform.pos.y + (float)sin(enemy.eye.angle) * enemy.eye.range
+	};
+
+	Vector2 fovUpper{
+		enemy.transform.pos.x + (float)cos(enemy.eye.angle + enemy.eye.fov / 2) * enemy.eye.range ,
+		enemy.transform.pos.y + (float)sin(enemy.eye.angle + enemy.eye.fov / 2) * enemy.eye.range
+	};
+	Vector2 fovLower{
+		enemy.transform.pos.x + (float)cos(enemy.eye.angle - enemy.eye.fov / 2) * enemy.eye.range ,
+		enemy.transform.pos.y + (float)sin(enemy.eye.angle - enemy.eye.fov / 2) * enemy.eye.range
+	};
+
+	DrawLine(enemy.eye.x - scroll.x , enemy.eye.y , enemy.transform.pos.x - scroll.x , enemy.transform.pos.y , GetColor(255 , 255 , 255) , true);
+	DrawLine(fovUpper.x - scroll.x , fovUpper.y , enemy.transform.pos.x - scroll.x , enemy.transform.pos.y , GetColor(255 , 255 , 255) , true);
+	DrawLine(fovCenter.x - scroll.x , fovCenter.y , fovUpper.x - scroll.x , fovUpper.y , GetColor(255 , 255 , 255) , true);
+	DrawLine(fovLower.x - scroll.x , fovLower.y , fovCenter.x - scroll.x , fovCenter.y , GetColor(255 , 255 , 255) , true);
+	DrawLine(enemy.transform.pos.x - scroll.x , enemy.transform.pos.y , fovLower.x - scroll.x , fovLower.y , GetColor(255 , 255 , 255) , true);
+#pragma endregion
+
+
+	SetDrawBlendMode(DX_BLENDMODE_NOBLEND , 100);
+}

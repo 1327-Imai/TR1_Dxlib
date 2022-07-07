@@ -10,12 +10,21 @@ public:
 	~Weapon();
 
 	//メンバ関数
-	void Update(double x , double y , double angle , Scroll scroll , int map[MAP_HEIGHT][MAP_WIDTH]);
+	void Update(Transform transform , Scroll scroll , int map[MAP_HEIGHT][MAP_WIDTH]);
 
 	void Draw();
 
-	//セッター,ゲッター
+	//アクセッサ
 	void SetIsShot(int isShot);
+	
+	Speed GetSpeed();
+	void SetSpeedFixedValue(float fixedValue);
+
+	void SetAngle(float angle);
+
+	float GetLength();
+
+	void SetLength(float length);
 
 private:
 	//メンバ変数
@@ -25,7 +34,7 @@ private:
 	Screen tipScreen;
 	Screen rootScreen;
 	Speed speed;
-	double angle;
+	float angle;
 	int weaponType;
 	int isShot;
 

@@ -4,6 +4,7 @@
 #include "Struct.h"
 #include "enum.h"
 #include "math.h"
+#include "Vector2.h"
 
 // ウィンドウのタイトルに表示する文字列
 const char TITLE[] = "TR1";
@@ -15,10 +16,10 @@ const int WIN_WIDTH = 640;
 const int WIN_HEIGHT = 480;
 
 //円周率
-const double PI = 3.141592;
+const float PI = 3.141592f;
 
 //重力
-const double G = 9.8;
+const float G = 9.8f;
 
 //マップチップのサイズ
 const int MAP_SIZE = 32;
